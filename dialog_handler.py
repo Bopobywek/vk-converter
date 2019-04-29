@@ -7,6 +7,7 @@ import vk
 
 from downloader_from_disks import RESOURCES
 from system_function import USER_FILES_DIRCTORY, create_folder, get_file_type
+from convert_functions import Converter
 from config import TOKEN
 
 user_sessions = dict()
@@ -53,15 +54,21 @@ class DialogHandler(object):
             downloader = result[0](result[1])
             file_info = downloader.download_file(os.path.join(USER_FILES_DIRCTORY, str(peer_id)))
             types_allowed = get_file_type(file_info.get('filename'))
+            if types_allowed is None:
+                message = 'Извините, но я не умею конвертировать файлы данного формата'
+                return dict(message=message)
             self.upsert_user_in_session(peer_id, dict(suggests=types_allowed,
                                                       filename=file_info.get('filename')))
-            print(self.user_get_suggest(peer_id))
             keyboard = self.create_keyboard(types_allowed)
             message = 'Пожалуйста, выберите на клавиатуре формат, в который вы хотите сконвертировать файл'
             return dict(keyboard=keyboard, message=message)
         elif bool(suggests):
             if request.get('object', dict()).get('text') in self.user_get_suggest(peer_id):
-                return dict(message='Конвертация успешна')
+                converter = Converter(path=os.path.join(USER_FILES_DIRCTORY, str(peer_id)),
+                                      filename=self.user_get_filename(peer_id),
+                                      new_format=request.get('object', dict()).get('text'))
+                converter.convert()
+                return dict(message='Конвертация прошла успешна')
             keyboard = self.create_keyboard(suggests)
             message = 'Пожалуйста, выберите на клавиатуре формат, в который вы хотите сконвертировать файл'
             return dict(keyboard=keyboard, message=message)
@@ -80,7 +87,7 @@ class DialogHandler(object):
                 'color': 'primary'
             }
             buttons_on_line.append(button)
-            if element[0] % 4 == 0:
+            if element[0] % 4 == 0 or element[0] == len(array_of_bodies):
                 buttons.append(buttons_on_line.copy())
                 buttons_on_line.clear()
         keyboard = {
@@ -105,6 +112,12 @@ class DialogHandler(object):
             if self.with_db:
                 pass
             return user_sessions[peer_id].get('suggests')
+
+    def user_get_filename(self, peer_id):
+        if self.user_in_session(peer_id):
+            if self.with_db:
+                pass
+            return user_sessions[peer_id].get('filename')
 
     @staticmethod
     def is_allowed_url(url):

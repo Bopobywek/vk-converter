@@ -5,6 +5,8 @@ import requests
 from werkzeug.utils import secure_filename
 from config import YANDEX_DISK_DOWNLOAD_URL, GOOGLE_DRIVE_DOWNLOAD_URL
 
+MAX_CONTENT_LENGTH = 400 * 1024 * 1024
+
 
 def get_filename(field, type_of_disk):
     if type_of_disk == 'google':
@@ -31,12 +33,14 @@ class YandexDiskDownloader(object):
         data = self.get_link_on_file()
         if isinstance(data, dict):
             if 'href' in data:
-                result = requests.get(data.get('href'))
-                filename = get_filename(result.headers.get('Content-Disposition'), type_of_disk='yandex')
-                file = result.content
-                with open(os.path.join(path, filename), mode='wb') as fout:
-                    fout.write(file)
-                return dict(filename=filename, file=file)
+                href = data.get('href')
+                if int(requests.head(href).headers.get('Content-Length')) <= MAX_CONTENT_LENGTH:
+                    result = requests.get(href)
+                    filename = get_filename(result.headers.get('Content-Disposition'), type_of_disk='yandex')
+                    file = result.content
+                    with open(os.path.join(path, filename), mode='wb') as fout:
+                        fout.write(file)
+                    return dict(filename=filename, file=file)
 
 
 class GoogleDriveDownloader(object):
@@ -52,13 +56,14 @@ class GoogleDriveDownloader(object):
             'export': 'download',
             'id': self.parse_link_to_id()
         }
-        # TODO: CHECK ERRORS
-        result = requests.get(GOOGLE_DRIVE_DOWNLOAD_URL, params=params)
-        filename = get_filename(result.headers.get('Content-Disposition'), type_of_disk='google')
-        file = result.content
-        with open(os.path.join(path, filename), mode='wb') as fout:
-            fout.write(file)
-        return dict(filename=filename, file=file)
+        if int(requests.head(GOOGLE_DRIVE_DOWNLOAD_URL,
+                             params=params).headers.get('Content-Length')) <= MAX_CONTENT_LENGTH:
+            result = requests.get(GOOGLE_DRIVE_DOWNLOAD_URL, params=params)
+            filename = get_filename(result.headers.get('Content-Disposition'), type_of_disk='google')
+            file = result.content
+            with open(os.path.join(path, filename), mode='wb') as fout:
+                fout.write(file)
+            return dict(filename=filename, file=file)
 
 
 RESOURCES = {'yadi.sk': YandexDiskDownloader, 'drive.google.com': GoogleDriveDownloader}

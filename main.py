@@ -1,12 +1,7 @@
-import os
-from urllib import parse
-from random import randint
-
-import vk
 from flask import Flask, request
 
-from config import CONFIRMATION_TOKEN, TOKEN
-from system_function import create_folder, USER_FILES_DIRCTORY, create_files, get_file_type
+from config import CONFIRMATION_TOKEN
+from system_function import create_files
 from dialog_handler import DialogHandler
 
 app = Flask(__name__)
