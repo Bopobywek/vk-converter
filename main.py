@@ -1,10 +1,17 @@
+import os
+from urllib import parse
+from random import randint
+
+import vk
 from flask import Flask, request
 
-from config import TOKEN, CONFIRMATION_TOKEN
-
+from config import CONFIRMATION_TOKEN, TOKEN
+from system_function import create_folder, USER_FILES_DIRCTORY, create_files, get_file_type
+from dialog_handler import DialogHandler
 
 app = Flask(__name__)
-user_sessions = dict()
+create_files()
+dialog = DialogHandler(version=5.95)
 
 
 @app.route('/', methods=['POST'])
@@ -15,10 +22,10 @@ def processed():
     elif data.get('type') == 'confirmation':
         return CONFIRMATION_TOKEN
     else:
-        user_id = data['object']['peer_id']
-        if user_id in user_sessions:
-            pass
-        else:
-            pass
+        if data['type'] == 'message_new':
+            dialog.handle_request(data)
+            return 'ok'
 
 
+if __name__ == '__main__':
+    app.run(port=8080)

@@ -1,3 +1,4 @@
+import os
 from urllib import parse
 import requests
 
@@ -31,7 +32,11 @@ class YandexDiskDownloader(object):
         if isinstance(data, dict):
             if 'href' in data:
                 result = requests.get(data.get('href'))
-                print(get_filename(result.headers.get('Content-Disposition'), type_of_disk='yandex'))
+                filename = get_filename(result.headers.get('Content-Disposition'), type_of_disk='yandex')
+                file = result.content
+                with open(os.path.join(path, filename), mode='wb') as fout:
+                    fout.write(file)
+                return dict(filename=filename, file=file)
 
 
 class GoogleDriveDownloader(object):
@@ -49,7 +54,14 @@ class GoogleDriveDownloader(object):
         }
         # TODO: CHECK ERRORS
         result = requests.get(GOOGLE_DRIVE_DOWNLOAD_URL, params=params)
-        print(get_filename(result.headers.get('Content-Disposition'), type_of_disk='google'))
+        filename = get_filename(result.headers.get('Content-Disposition'), type_of_disk='google')
+        file = result.content
+        with open(os.path.join(path, filename), mode='wb') as fout:
+            fout.write(file)
+        return dict(filename=filename, file=file)
+
+
+RESOURCES = {'yadi.sk': YandexDiskDownloader, 'drive.google.com': GoogleDriveDownloader}
 
 
 if __name__ == '__main__':
