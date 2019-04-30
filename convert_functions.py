@@ -7,7 +7,7 @@ from PIL import Image
 from pydub import AudioSegment
 
 PICTURE_SUPPORTED_FORMATS = ['WEBP', 'BMP', 'PPM',
-                             'JPEG', 'TIFF', 'GIF', 'PNG', 'JPG']
+                             'JPEG', 'TIFF', 'PNG', 'JPG']
 AUDIO_SUPPORTED_FORMATS = ['MP3', 'WAV', 'OGG', 'FLAC']
 VIDEO_SUPPORTED_FORMATS = ['AVI', 'GIF', 'OGG', 'FLV', 'MKV', 'MP4']
 

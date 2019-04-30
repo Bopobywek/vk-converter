@@ -2,6 +2,7 @@ import json
 import os
 from urllib import parse
 from random import randint
+import logging
 
 import vk
 
@@ -12,7 +13,10 @@ from config import TOKEN
 
 user_sessions = dict()
 
-HOST = 'http://vbnx.pythonanywhere.com'
+HOST = 'http://benjamingg.pythonanywhere.com'
+
+logging.basicConfig(filename='converter.log',
+                    format='%(asctime)s %(levelname)s %(name)s %(message)s', level=logging.ERROR)
 
 
 class DialogHandler(object):
@@ -28,8 +32,10 @@ class DialogHandler(object):
         if isinstance(request, dict):
             peer_id = self.get_peer_id(request)
             if not self.user_in_session(peer_id):
+                logging.info('New user added. Peer_id: {}'.format(peer_id))
                 self.upsert_user_in_session(peer_id, list())
             msg = self.generate_message(peer_id, request)
+            logging.info('New message was generated. Message: {}'.format(msg))
             self.send_message(peer_id, message=msg.get('message'), keyboard=msg.get('keyboard', None))
 
     @staticmethod
@@ -51,6 +57,7 @@ class DialogHandler(object):
         result = self.find_link_in_request(request)
         if result is not None:
             create_folder(str(peer_id))
+            logging.info('Directory created: {}'.format(str(peer_id)))
             downloader = result[0](result[1])
             file_info = downloader.download_file(os.path.join(USER_FILES_DIRCTORY, str(peer_id)))
             types_allowed = get_file_type(file_info.get('filename'))
@@ -59,18 +66,27 @@ class DialogHandler(object):
                 return dict(message=message)
             self.upsert_user_in_session(peer_id, types_allowed)
             keyboard = self.create_keyboard(types_allowed)
-            message = 'После вашего выбора начнется конвертация. Она займет некоторое время.' \
-                      'Пожалуйста, выберите на клавиатуре формат, в который вы хотите сконвертировать файл'
+            message = 'Пожалуйста, укажите на клавиатуре формат, в который вы хотите сконвертировать файл. ' \
+                      'После начнется конвертация. Она займет некоторое время.'
             return dict(keyboard=keyboard, message=message)
         else:
+            logging.info('Users suggest: {}'.format(self.user_get_suggest(peer_id)))
             if request.get('object', dict()).get('text', None) in self.user_get_suggest(peer_id):
                 path = os.path.join(USER_FILES_DIRCTORY, str(peer_id))
+                directory = os.listdir(path)
+                if bool(directory):
+                    filename = directory[0]
+                else:
+                    logging.error('File not found. Dir: {}'.format(directory))
+                    return dict(message='Извините, возникла ошибка. Файл не найден.')
                 converter = Converter(path=path,
-                                      filename=os.listdir(path)[0],
+                                      filename=filename,
                                       new_format=request.get('object', dict()).get('text'))
                 res = converter.convert()
                 self.delete_user_suggest(peer_id)
                 if bool(res):
+                    for e in res:
+                        logging.error(e)
                     delete_folder(str(peer_id))
                     return dict(message='Извините, возникла ошибка при конвертации, попробуйте ещё раз.')
                 return dict(message='Ссылка на скачивание: {}'.format('{}/download/{}'.format(HOST,
