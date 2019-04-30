@@ -1,11 +1,15 @@
 import os
 from urllib import parse
 import requests
+import logging
 
 from werkzeug.utils import secure_filename
 from config import YANDEX_DISK_DOWNLOAD_URL, GOOGLE_DRIVE_DOWNLOAD_URL
 
 MAX_CONTENT_LENGTH = 400 * 1024 * 1024
+
+logging.basicConfig(filename='converter.log',
+                    format='%(asctime)s %(levelname)s %(name)s %(message)s', level=logging.ERROR)
 
 
 def get_filename(field, type_of_disk):
@@ -26,21 +30,25 @@ class YandexDiskDownloader(object):
         params = {
             'public_key': self.public_key
         }
-        # TODO: CHECK ERRORS
         return requests.get(YANDEX_DISK_DOWNLOAD_URL, params=params).json()
 
     def download_file(self, path):
-        data = self.get_link_on_file()
-        if isinstance(data, dict):
-            if 'href' in data:
-                href = data.get('href')
-                if int(requests.head(href).headers.get('Content-Length')) <= MAX_CONTENT_LENGTH:
-                    result = requests.get(href)
-                    filename = get_filename(result.headers.get('Content-Disposition'), type_of_disk='yandex')
-                    file = result.content
-                    with open(os.path.join(path, filename), mode='wb') as fout:
-                        fout.write(file)
-                    return dict(filename=filename, file=file)
+        try:
+            data = self.get_link_on_file()
+            if isinstance(data, dict):
+                if 'href' in data:
+                    href = data.get('href')
+                    if int(requests.head(href).headers.get('Content-Length')) <= MAX_CONTENT_LENGTH:
+                        result = requests.get(href)
+                        logging.info('request yo disk Yandex: {}'.format(result))
+                        filename = get_filename(result.headers.get('Content-Disposition'), type_of_disk='yandex')
+                        file = result.content
+                        with open(os.path.join(path, filename), mode='wb') as fout:
+                            fout.write(file)
+                        return dict(filename=filename, file=file)
+        except Exception as e:
+            logging.error(e)
+            return dict()
 
 
 class GoogleDriveDownloader(object):
@@ -52,20 +60,25 @@ class GoogleDriveDownloader(object):
         return parse.parse_qs(parse.urlsplit(self.url).query).get('id')[0]
 
     def download_file(self, path):
-        params = {
-            'export': 'download',
-            'id': self.parse_link_to_id()
-        }
-        result = requests.get(GOOGLE_DRIVE_DOWNLOAD_URL, params=params)
-        filename = get_filename(result.headers.get('Content-Disposition'), type_of_disk='google')
-        file = result.content
-        with open(os.path.join(path, filename), mode='wb') as fout:
-            fout.write(file)
-        return dict(filename=filename, file=file)
+        try:
+            params = {
+                'export': 'download',
+                'id': self.parse_link_to_id()
+            }
+            logging.info('request to Google Drive with id: {}'.format(params.get('id')))
+            result = requests.get(GOOGLE_DRIVE_DOWNLOAD_URL, params=params)
+            filename = get_filename(result.headers.get('Content-Disposition'), type_of_disk='google')
+            file = result.content
+            with open(os.path.join(path, filename), mode='wb') as fout:
+                fout.write(file)
+            return dict(filename=filename, file=file)
+        except Exception as e:
+            logging.error(e)
+            return dict()
 
 
 RESOURCES = {'yadi.sk': YandexDiskDownloader, 'drive.google.com': GoogleDriveDownloader}
 
 
 if __name__ == '__main__':
-    GoogleDriveDownloader('https://drive.google.com/open?id=1G9AWPnExDoscZfb84h5uVxrjl-m5nvTN').download_file('')
+    pass
