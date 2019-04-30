@@ -9,7 +9,7 @@ VK-converter is a bot that can convert audio,
  
  ## Instruction
  
- `RU`: Чтобы перейти к конвертации отправьте боту ссылку на облачное хранилище с 
+ `RU`: Чтобы перейти к конвертации отправьте боту ссылку на облачное хранилище с файлом
  или любое текстовое сообщение. Далее следуйте сообщениям бота
  
  `EN`: To proceed to the conversion, send the bot a link to the cloud storage from
