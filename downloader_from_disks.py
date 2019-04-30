@@ -56,18 +56,16 @@ class GoogleDriveDownloader(object):
             'export': 'download',
             'id': self.parse_link_to_id()
         }
-        if int(requests.head(GOOGLE_DRIVE_DOWNLOAD_URL,
-                             params=params).headers.get('Content-Length')) <= MAX_CONTENT_LENGTH:
-            result = requests.get(GOOGLE_DRIVE_DOWNLOAD_URL, params=params)
-            filename = get_filename(result.headers.get('Content-Disposition'), type_of_disk='google')
-            file = result.content
-            with open(os.path.join(path, filename), mode='wb') as fout:
-                fout.write(file)
-            return dict(filename=filename, file=file)
+        result = requests.get(GOOGLE_DRIVE_DOWNLOAD_URL, params=params)
+        filename = get_filename(result.headers.get('Content-Disposition'), type_of_disk='google')
+        file = result.content
+        with open(os.path.join(path, filename), mode='wb') as fout:
+            fout.write(file)
+        return dict(filename=filename, file=file)
 
 
 RESOURCES = {'yadi.sk': YandexDiskDownloader, 'drive.google.com': GoogleDriveDownloader}
 
 
 if __name__ == '__main__':
-    pass
+    GoogleDriveDownloader('https://drive.google.com/open?id=1G9AWPnExDoscZfb84h5uVxrjl-m5nvTN').download_file('')

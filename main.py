@@ -1,7 +1,6 @@
-from flask import Flask, request
-
+from flask import Flask, request, send_file
 from config import CONFIRMATION_TOKEN
-from system_function import create_files
+from system_function import create_files, USER_FILES_DIRCTORY
 from dialog_handler import DialogHandler
 
 app = Flask(__name__)
@@ -20,6 +19,11 @@ def processed():
         if data['type'] == 'message_new':
             dialog.handle_request(data)
             return 'ok'
+
+
+@app.route('/download/<path:file>')
+def download_path(file):
+    return send_file(file, as_attachment=True)
 
 
 if __name__ == '__main__':
