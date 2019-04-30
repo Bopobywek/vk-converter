@@ -7,8 +7,8 @@ from PIL import Image
 from pydub import AudioSegment
 
 PICTURE_SUPPORTED_FORMATS = ['WEBP', 'BMP', 'PPM',
-                             'JPEG', 'TIFF', 'GIF', 'PNG', 'SGI', 'JPG']
-AUDIO_SUPPORTED_FORMATS = ['MP3', 'WAV', 'OGG', 'FLAC', 'OPUS']
+                             'JPEG', 'TIFF', 'PNG', 'JPG']
+AUDIO_SUPPORTED_FORMATS = ['MP3', 'WAV', 'OGG', 'FLAC']
 VIDEO_SUPPORTED_FORMATS = ['AVI', 'GIF', 'OGG', 'FLV', 'MKV', 'MP4']
 
 
@@ -172,6 +172,7 @@ class Converter(object):
         self.path = path
         self.filename = filename
         self.new_format = new_format
+        self.new_file_path = ''
 
     def convert(self):
         converter = None
@@ -186,6 +187,8 @@ class Converter(object):
             result = converter.convert(self.new_format)
             if not isinstance(result, dict):
                 errors.append(result)
+            else:
+                self.new_file_path = result.get('new_file_path')
         return errors
 
 

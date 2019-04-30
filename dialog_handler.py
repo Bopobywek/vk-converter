@@ -2,15 +2,21 @@ import json
 import os
 from urllib import parse
 from random import randint
+import logging
 
 import vk
 
 from downloader_from_disks import RESOURCES
-from system_function import USER_FILES_DIRCTORY, create_folder, get_file_type
+from system_function import USER_FILES_DIRCTORY, delete_folder, create_folder, get_file_type
 from convert_functions import Converter
 from config import TOKEN
 
 user_sessions = dict()
+
+HOST = 'http://benjamingg.pythonanywhere.com'
+
+logging.basicConfig(filename='converter.log',
+                    format='%(asctime)s %(levelname)s %(name)s %(message)s', level=logging.ERROR)
 
 
 class DialogHandler(object):
@@ -26,8 +32,10 @@ class DialogHandler(object):
         if isinstance(request, dict):
             peer_id = self.get_peer_id(request)
             if not self.user_in_session(peer_id):
-                self.upsert_user_in_session(peer_id, dict(suggests=[]))
-            msg = self.generate_message(peer_id, self.user_get_suggest(peer_id), request)
+                logging.info('New user added. Peer_id: {}'.format(peer_id))
+                self.upsert_user_in_session(peer_id, list())
+            msg = self.generate_message(peer_id, request)
+            logging.info('New message was generated. Message: {}'.format(msg))
             self.send_message(peer_id, message=msg.get('message'), keyboard=msg.get('keyboard', None))
 
     @staticmethod
@@ -45,33 +53,61 @@ class DialogHandler(object):
         self.api.messages.send(peer_id=peer_id, access_token=TOKEN,
                                message=message, random_id=randint(1, 10**10))
 
-    def generate_message(self, peer_id, suggests, request):
-        if not bool(suggests):
-            result = self.find_link_in_request(request)
-            if result is None:
-                return dict(message='Пожалуйста, отправьте ссылку на файл')
+    def generate_message(self, peer_id, request):
+        result = self.find_link_in_request(request)
+        if result is not None:
             create_folder(str(peer_id))
+            logging.info('Directory created: {}'.format(str(peer_id)))
             downloader = result[0](result[1])
             file_info = downloader.download_file(os.path.join(USER_FILES_DIRCTORY, str(peer_id)))
             types_allowed = get_file_type(file_info.get('filename'))
             if types_allowed is None:
                 message = 'Извините, но я не умею конвертировать файлы данного формата'
                 return dict(message=message)
-            self.upsert_user_in_session(peer_id, dict(suggests=types_allowed,
-                                                      filename=file_info.get('filename')))
+            self.upsert_user_in_session(peer_id, types_allowed)
             keyboard = self.create_keyboard(types_allowed)
-            message = 'Пожалуйста, выберите на клавиатуре формат, в который вы хотите сконвертировать файл'
+            message = 'Пожалуйста, укажите на клавиатуре формат, в который вы хотите сконвертировать файл. ' \
+                      'После начнется конвертация. Она займет некоторое время. Если у Вас не отображается клавиатура,' \
+                      ' то введите один из типов: {}'.format(', '.join(types_allowed))
             return dict(keyboard=keyboard, message=message)
-        elif bool(suggests):
-            if request.get('object', dict()).get('text') in self.user_get_suggest(peer_id):
-                converter = Converter(path=os.path.join(USER_FILES_DIRCTORY, str(peer_id)),
-                                      filename=self.user_get_filename(peer_id),
+        else:
+            logging.info('Users suggest: {}'.format(self.user_get_suggest(peer_id)))
+            if request.get('object', dict()).get('text', None).upper() in self.user_get_suggest(peer_id):
+                path = os.path.join(USER_FILES_DIRCTORY, str(peer_id))
+                directory = os.listdir(path)
+                if bool(directory):
+                    filename = directory[0]
+                else:
+                    logging.error('File not found. Dir: {}'.format(directory))
+                    return dict(message='Извините, возникла ошибка. Файл не найден.')
+                converter = Converter(path=path,
+                                      filename=filename,
                                       new_format=request.get('object', dict()).get('text'))
-                converter.convert()
-                return dict(message='Конвертация прошла успешна')
-            keyboard = self.create_keyboard(suggests)
-            message = 'Пожалуйста, выберите на клавиатуре формат, в который вы хотите сконвертировать файл'
-            return dict(keyboard=keyboard, message=message)
+                res = converter.convert()
+                self.delete_user_suggest(peer_id)
+                if bool(res):
+                    for e in res:
+                        logging.error(e)
+                    delete_folder(str(peer_id))
+                    return dict(message='Извините, возникла ошибка при конвертации, попробуйте ещё раз.')
+                return dict(message='Ссылка на скачивание: {}'.format('{}/download/{}'.format(HOST,
+                                                                                              converter.new_file_path)))
+            else:
+                if bool(self.user_get_suggest(peer_id=peer_id)):
+                    keyboard = self.create_keyboard(self.user_get_suggest(peer_id))
+                    message = 'Пожалуйста, выберите на клавиатуре формат, в который вы хотите сконвертировать файл. ' \
+                              'Если у Вас не отображается клавиатура,' \
+                              ' то введите один из типов: {}'.format(', '.join(self.user_get_suggest(peer_id)))
+                    return dict(keyboard=keyboard, message=message)
+                else:
+                    message = 'Пожалуйста, отправьте ссылку на файл (Яндекс.Диск или Google Drive)'
+                    return dict(message=message)
+
+    def send_error_message(self, data):
+        message = 'Во время вашего обработки вашего запроса возникла ошибка.' \
+                  ' Попробуйте изменить тип конвертации. Напоминаю, что бот поддерживает ' \
+                  'конвертацию аудио, видео и картинок.'
+        self.send_message(self.get_peer_id(data), message=message)
 
     @staticmethod
     def create_keyboard(array_of_bodies):
@@ -111,13 +147,13 @@ class DialogHandler(object):
         if self.user_in_session(peer_id):
             if self.with_db:
                 pass
-            return user_sessions[peer_id].get('suggests')
+            return user_sessions[peer_id]
 
-    def user_get_filename(self, peer_id):
+    def delete_user_suggest(self, peer_id):
         if self.user_in_session(peer_id):
             if self.with_db:
                 pass
-            return user_sessions[peer_id].get('filename')
+            del user_sessions[peer_id]
 
     @staticmethod
     def is_allowed_url(url):
@@ -138,7 +174,7 @@ class DialogHandler(object):
         else:
             attachments = list(filter(lambda dictionary: dictionary.get('type') == 'link', attachments))
             if bool(attachments):
-                link = attachments[0].get('link', '')
+                link = attachments[0].get('link', '').get('url', '')
                 result = self.is_allowed_url(link)
                 if result is not None:
                     return result, link

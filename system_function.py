@@ -33,3 +33,7 @@ def get_file_type(file):
         return PICTURE_SUPPORTED_FORMATS
     elif suf in VIDEO_SUPPORTED_FORMATS:
         return VIDEO_SUPPORTED_FORMATS
+
+
+if __name__ == '__main__':
+    print(get_file_type('simplescreenrecorder1-2018-12-11_20.20.32.mp4'))
