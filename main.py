@@ -3,7 +3,7 @@ import logging
 
 from flask import Flask, request, send_file
 from config import CONFIRMATION_TOKEN
-from system_function import create_files, USER_FILES_DIRCTORY
+from system_function import create_files
 from dialog_handler import DialogHandler
 
 app = Flask(__name__)
@@ -22,13 +22,14 @@ def processed():
     elif data.get('type') == 'confirmation':
         return CONFIRMATION_TOKEN
     else:
-        logging.info('Request: {}'.format(request))
+        logging.info('Request: {}'.format(data))
         try:
             if data['type'] == 'message_new':
                 dialog.handle_request(data)
                 return 'ok'
         except Exception as e:
             logging.error('Error while working with user. Error: {}'.format(e))
+            dialog.send_error_message(data)
             return 'ok'
 
 

@@ -67,11 +67,12 @@ class DialogHandler(object):
             self.upsert_user_in_session(peer_id, types_allowed)
             keyboard = self.create_keyboard(types_allowed)
             message = 'Пожалуйста, укажите на клавиатуре формат, в который вы хотите сконвертировать файл. ' \
-                      'После начнется конвертация. Она займет некоторое время.'
+                      'После начнется конвертация. Она займет некоторое время. Если у Вас не отображается клавиатура,' \
+                      ' то введите один из типов: {}'.format(', '.join(types_allowed))
             return dict(keyboard=keyboard, message=message)
         else:
             logging.info('Users suggest: {}'.format(self.user_get_suggest(peer_id)))
-            if request.get('object', dict()).get('text', None) in self.user_get_suggest(peer_id):
+            if request.get('object', dict()).get('text', None).upper() in self.user_get_suggest(peer_id):
                 path = os.path.join(USER_FILES_DIRCTORY, str(peer_id))
                 directory = os.listdir(path)
                 if bool(directory):
@@ -94,11 +95,19 @@ class DialogHandler(object):
             else:
                 if bool(self.user_get_suggest(peer_id=peer_id)):
                     keyboard = self.create_keyboard(self.user_get_suggest(peer_id))
-                    message = 'Пожалуйста, выберите на клавиатуре формат, в который вы хотите сконвертировать файл'
+                    message = 'Пожалуйста, выберите на клавиатуре формат, в который вы хотите сконвертировать файл. ' \
+                              'Если у Вас не отображается клавиатура,' \
+                              ' то введите один из типов: {}'.format(', '.join(self.user_get_suggest(peer_id)))
                     return dict(keyboard=keyboard, message=message)
                 else:
-                    message = 'Пожалуйста, отправьте ссылку на файл'
+                    message = 'Пожалуйста, отправьте ссылку на файл (Яндекс.Диск или Google Drive)'
                     return dict(message=message)
+
+    def send_error_message(self, data):
+        message = 'Во время вашего обработки вашего запроса возникла ошибка.' \
+                  ' Попробуйте изменить тип конвертации. Напоминаю, что бот поддерживает ' \
+                  'конвертацию аудио, видео и картинок.'
+        self.send_message(self.get_peer_id(data), message=message)
 
     @staticmethod
     def create_keyboard(array_of_bodies):
